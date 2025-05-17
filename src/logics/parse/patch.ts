@@ -1,24 +1,17 @@
-import { ParseOptions, ParsedCommit, FileChange } from "../../types";
+import { ParseOptions, ParsedCommit } from "../../types";
 import { parseDiffToStructured } from "./diffToStructured";
+import { HEADERS, REGEX } from "../../consts";
 
-const HEADERS = {
-  FROM: "From: ",
-  DATE: "Date: ",
-  SUBJECT: "Subject: ",
-};
-
-const REGEX = {
-  FROM: /^From\s+([0-9a-f]{40})\s/,
-  AUTHOR_EMAIL: /<(.*)>/,
-  PATCH_HEADER: /^\[PATCH[^\]]*\]\s*/,
-};
-
-export function parseGitPatch(
+export function parseGitPatch<
+  O extends ParseOptions<any, any> = ParseOptions<false, false>
+>(
   patch: string,
-  options: ParseOptions = {}
-): ParsedCommit[] {
+  options: O = { parseDates: false, structuredDiff: false } as O
+): ParsedCommit<O>[] {
+  type DateType = ParsedCommit<O>["date"];
+  type DiffType = ParsedCommit<O>["diff"];
   const lines = patch.split("\n");
-  const commits: ParsedCommit[] = [];
+  const commits: ParsedCommit<O>[] = [];
 
   let currentSha = "";
   let currentAuthorName = "";
@@ -28,40 +21,26 @@ export function parseGitPatch(
   let currentDiffLines: string[] = [];
   let inMessageSection = false;
   let inDiffSection = false;
-  let foundDiffStart = false; // To track when we've hit `diff --git`
+  let foundDiffStart = false;
 
   const finalizeCommit = () => {
-    if (!currentSha) return; // No commit started yet
+    if (!currentSha) return;
 
-    const message = currentMessageLines.join("\n").trimEnd(); // trimEnd to preserve leading/internal newlines
-    let date: string | Date = currentDate;
-    // Join lines, then trim trailing newlines that might have been added if the original patch ended with multiple blank lines.
-    // Then, ensure a single trailing newline if there's content.
+    const message = currentMessageLines.join("\n").trimEnd();
     let diffString = currentDiffLines.join("\n").replace(/\n+$/, "");
     if (diffString.length > 0) {
       diffString += "\n";
     }
-    
-    let diff: string | FileChange[] = diffString;
 
-    // Process based on options
-    if (options.parseDates && currentDate) {
-      try {
-        date = new Date(currentDate);
-      } catch (e) {
-        // Keep original string if date parsing fails
-        console.warn(`Failed to parse date: ${currentDate}`);
-      }
-    }
+    const date = (
+      options.parseDates && currentDate ? new Date(currentDate) : currentDate
+    ) as DateType;
 
-    // Process structured diff
-    if (
-      options.structuredDiff &&
-      typeof diff === "string" &&
-      diff.trim().length > 0
-    ) {
-      diff = parseDiffToStructured(diff);
-    }
+    const shouldStructurizeDiff =
+      options.structuredDiff && diffString.trim().length > 0;
+    const diff = (
+      shouldStructurizeDiff ? parseDiffToStructured(diffString) : diffString
+    ) as DiffType;
 
     commits.push({
       sha: currentSha,
@@ -72,7 +51,6 @@ export function parseGitPatch(
       diff,
     });
 
-    // Reset for next commit
     resetCommitState();
   };
 
@@ -89,7 +67,6 @@ export function parseGitPatch(
   };
 
   for (const line of lines) {
-    // Detect the start of a new commit
     const fromMatch = line.match(REGEX.FROM);
     if (fromMatch) {
       finalizeCommit();
@@ -97,7 +74,6 @@ export function parseGitPatch(
       continue;
     }
 
-    // Parse author line: From: Name <email>
     if (line.startsWith(HEADERS.FROM)) {
       const authorLine = line.slice(HEADERS.FROM.length).trim();
       const emailMatch = authorLine.match(REGEX.AUTHOR_EMAIL);
@@ -110,52 +86,39 @@ export function parseGitPatch(
       continue;
     }
 
-    // Parse date line: Date: ...
     if (line.startsWith(HEADERS.DATE)) {
       currentDate = line.slice(HEADERS.DATE.length).trim();
       continue;
     }
 
-    // Parse subject line
     if (line.startsWith(HEADERS.SUBJECT)) {
       let subject = line.slice(HEADERS.SUBJECT.length).trim();
-      // Remove leading "[PATCH ...]" if present
       subject = subject.replace(REGEX.PATCH_HEADER, "");
       currentMessageLines.push(subject);
       inMessageSection = true;
       continue;
     }
 
-    // Check if we are transitioning to diff section
     if (inMessageSection && line.trim() === "---") {
       inMessageSection = false;
       inDiffSection = true;
       continue;
     }
 
-    // If we are in the message section, just append lines to message
     if (inMessageSection) {
-      // For subject lines, they are already pushed.
-      // For subsequent message lines, they might have leading spaces from the patch format.
-      // We should preserve these as they are part of the message.
       currentMessageLines.push(line);
       continue;
     }
 
-    // If we are in the diff section but haven't found `diff --git` yet
     if (inDiffSection && !foundDiffStart) {
-      // Look for the start of the actual diff
       if (line.startsWith("diff --git ")) {
         foundDiffStart = true;
         currentDiffLines.push(line);
       }
-      // Ignore everything until we find `diff --git`
       continue;
     }
 
-    // If we are in diff section and already found `diff --git`
     if (inDiffSection && foundDiffStart) {
-      // Stop capturing when we hit a line that, after trimming, is `--`
       if (line.trim() === "--") {
         inDiffSection = false;
         foundDiffStart = false;

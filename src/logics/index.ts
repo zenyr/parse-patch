@@ -1,1 +1,1 @@
-export * from "./parse/gitPatch";
+export * from "./parse/patch";

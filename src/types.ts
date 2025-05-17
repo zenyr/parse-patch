@@ -1,6 +1,9 @@
-export interface ParseOptions {
-  parseDates?: boolean;
-  structuredDiff?: boolean;
+export interface ParseOptions<
+  PDate extends boolean = boolean, // Allow any boolean for the base definition
+  SDiff extends boolean = boolean // Allow any boolean for the base definition
+> {
+  parseDates?: PDate;
+  structuredDiff?: SDiff;
 }
 
 export interface FileChange {
@@ -21,11 +24,15 @@ export interface DiffLine {
   content: string;
 }
 
-export interface ParsedCommit {
+type SelectIfTrue<T extends boolean | undefined, U, V> = T extends true ? U : V;
+
+export interface ParsedCommit<
+  O extends ParseOptions<boolean, boolean> = ParseOptions<false, false>
+> {
   sha: string;
   authorName: string;
   authorEmail: string;
-  date: string | Date;
+  date: SelectIfTrue<O["parseDates"], Date, string>;
   message: string;
-  diff: string | FileChange[];
+  diff: SelectIfTrue<O["structuredDiff"], FileChange, string>;
 }
