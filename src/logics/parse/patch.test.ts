@@ -187,3 +187,79 @@ index 4328ba4..63af774 100644
     expect(commits[0].diff).toBe(expectedDiff);
   });
 });
+
+describe("parseGitPatch with options", () => {
+  const mockCommit = mockSingleCommit; // Use a simple mock for option testing
+
+  it("parses with parseDates: true", () => {
+    const commits = parseGitPatch(mockCommit, { parseDates: true });
+    expect(commits).toHaveLength(1);
+    const commit = commits[0];
+    expect(commit.date).toBeInstanceOf(Date);
+    expect((commit.date as Date).toISOString()).toBe(
+      new Date("Wed, 12 Oct 2022 14:38:15 +0200").toISOString()
+    );
+    expect(typeof commit.diff).toBe("string"); // structuredDiff is false by default or explicitly
+  });
+
+  it("parses with structuredDiff: true", () => {
+    const commits = parseGitPatch(mockCommit, { structuredDiff: true });
+    expect(commits).toHaveLength(1);
+    const commit = commits[0];
+    expect(typeof commit.date).toBe("string"); // parseDates is false
+    expect(Array.isArray(commit.diff)).toBe(true);
+    expect(commit.diff.length).toBeGreaterThan(0);
+    const firstDiff = commit.diff[0];
+    expect(firstDiff).toHaveProperty("oldPath");
+    expect(firstDiff).toHaveProperty("newPath");
+    expect(firstDiff).toHaveProperty("hunks");
+    expect(firstDiff.oldPath).toBe("file1.txt");
+    expect(firstDiff.newPath).toBe("file1.txt");
+    expect(firstDiff.hunks).toBeArray();
+    expect(firstDiff.hunks[0].lines).toBeArray();
+  });
+
+  it("parses with parseDates: true and structuredDiff: true", () => {
+    const commits = parseGitPatch(mockCommit, {
+      parseDates: true,
+      structuredDiff: true,
+    });
+    expect(commits).toHaveLength(1);
+    const commit = commits[0];
+    expect(commit.date).toBeInstanceOf(Date);
+    expect((commit.date as Date).toISOString()).toBe(
+      new Date("Wed, 12 Oct 2022 14:38:15 +0200").toISOString()
+    );
+    expect(Array.isArray(commit.diff)).toBe(true);
+    expect(commit.diff.length).toBeGreaterThan(0);
+    const firstDiff = commit.diff[0];
+    expect(firstDiff).toHaveProperty("oldPath");
+    expect(firstDiff).toHaveProperty("newPath");
+    expect(firstDiff).toHaveProperty("hunks");
+    expect(firstDiff.oldPath).toBe("file1.txt");
+    expect(firstDiff.newPath).toBe("file1.txt");
+  });
+
+  it("parses with default options (equivalent to parseDates: false, structuredDiff: false)", () => {
+    const commits = parseGitPatch(mockCommit, {}); // Empty options object
+    expect(commits).toHaveLength(1);
+    const commit = commits[0];
+    expect(typeof commit.date).toBe("string");
+    expect(commit.date).toBe("Wed, 12 Oct 2022 14:38:15 +0200");
+    expect(typeof commit.diff).toBe("string");
+    expect(commit.diff).toContain("diff --git a/file1.txt b/file1.txt");
+  });
+
+  it("parses with explicit false options", () => {
+    const commits = parseGitPatch(mockCommit, {
+      parseDates: false,
+      structuredDiff: false,
+    });
+    expect(commits).toHaveLength(1);
+    const commit = commits[0];
+    expect(typeof commit.date).toBe("string");
+    expect(commit.date).toBe("Wed, 12 Oct 2022 14:38:15 +0200");
+    expect(typeof commit.diff).toBe("string");
+    expect(commit.diff).toContain("diff --git a/file1.txt b/file1.txt");
+  });
+});

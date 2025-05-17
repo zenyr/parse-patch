@@ -3,11 +3,8 @@ import { parseDiffToStructured } from "./diffToStructured";
 import { HEADERS, REGEX } from "../../consts";
 
 export function parseGitPatch<
-  O extends ParseOptions<any, any> = ParseOptions<false, false>
->(
-  patch: string,
-  options: O = { parseDates: false, structuredDiff: false } as O
-): ParsedCommit<O>[] {
+  O extends ParseOptions<boolean, boolean> = ParseOptions<false, false>
+>(patch: string, options?: O): ParsedCommit<O>[] {
   type DateType = ParsedCommit<O>["date"];
   type DiffType = ParsedCommit<O>["diff"];
   const lines = patch.split("\n");
@@ -33,11 +30,11 @@ export function parseGitPatch<
     }
 
     const date = (
-      options.parseDates && currentDate ? new Date(currentDate) : currentDate
+      options?.parseDates && currentDate ? new Date(currentDate) : currentDate
     ) as DateType;
 
     const shouldStructurizeDiff =
-      options.structuredDiff && diffString.trim().length > 0;
+      options?.structuredDiff && diffString.trim().length > 0;
     const diff = (
       shouldStructurizeDiff ? parseDiffToStructured(diffString) : diffString
     ) as DiffType;

@@ -19,7 +19,7 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
-export interface DiffLine {
+interface DiffLine {
   type: "addition" | "deletion" | "context";
   content: string;
 }
@@ -34,5 +34,5 @@ export interface ParsedCommit<
   authorEmail: string;
   date: SelectIfTrue<O["parseDates"], Date, string>;
   message: string;
-  diff: SelectIfTrue<O["structuredDiff"], FileChange, string>;
+  diff: SelectIfTrue<O["structuredDiff"], FileChange[], string>;
 }
