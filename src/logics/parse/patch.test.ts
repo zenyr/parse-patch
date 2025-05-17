@@ -1,16 +1,16 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseGitPatch } from "./patch.js";
 import {
-  mockSingleCommit,
-  mockMultipleCommits,
-  mockNoMessageLinesAfterSubject,
-  mockNoDiff,
-  mockMalformed,
-  mockMultipleFilesAndHunks,
-  mockLongTrickyMessage,
   mockCreateWorkerPlaceholder,
+  mockLongTrickyMessage,
+  mockMalformed,
+  mockMultipleCommits,
+  mockMultipleFilesAndHunks,
+  mockNoDiff,
+  mockNoMessageLinesAfterSubject,
+  mockSingleCommit,
 } from "../../mocks/patch.js";
+import { parseGitPatch } from "./patch.js";
 
 describe("parseGitPatch", () => {
   it("parses a single commit patch", () => {
