@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { parseGitPatch } from "./index.js";
+import { parseGitPatch } from "./patch.js";
 
 describe("parseGitPatch", () => {
   it("parses a single commit patch", () => {
@@ -37,7 +37,7 @@ Line 6
     expect(commit.authorEmail).toBe("john@example.com");
     expect(commit.date).toBe("Wed, 12 Oct 2022 14:38:15 +0200");
     expect(commit.message).toBe(
-      "My commit message\n\nSome more lines of the commit message.",
+      "My commit message\n\nSome more lines of the commit message."
     );
     expect(commit.diff).toBe(`diff --git a/file1.txt b/file1.txt
 index 24967d3..b37620a 100644
@@ -131,7 +131,7 @@ Line foo
     expect(second.authorEmail).toBe("jane@example.com");
     expect(second.date).toBe("Thu, 13 Oct 2022 15:38:15 +0200");
     expect(second.message).toBe(
-      "Second commit message\n\nAnother line\nAnd another.",
+      "Second commit message\n\nAnother line\nAnd another."
     );
     expect(second.diff).toBe(`diff --git a/file2.txt b/file2.txt
 index 24967d3..b37620a 100644
@@ -248,7 +248,7 @@ index 0000000..0abcd12
     expect(commit.authorEmail).toBe("multihunk@example.com");
     expect(commit.date).toBe("Sat, 15 Oct 2022 16:00:00 +0000");
     expect(commit.message).toBe(
-      "Multiple files and hunks commit\n\nThis commit changes multiple files and has multiple hunks in one file.",
+      "Multiple files and hunks commit\n\nThis commit changes multiple files and has multiple hunks in one file."
     );
 
     // Check that diff contains both files and multiple hunks
@@ -359,7 +359,7 @@ index 4328ba4..63af774 100644
 -- 
 2.39.5`;
 
-    const expextedDiff = `diff --git a/src/ai/workers/create-worker.ts b/src/ai/workers/create-worker.ts
+    const expectedDiff = `diff --git a/src/ai/workers/create-worker.ts b/src/ai/workers/create-worker.ts
 index 4328ba4..63af774 100644
 --- a/src/ai/workers/create-worker.ts
 +++ b/src/ai/workers/create-worker.ts
@@ -376,6 +376,6 @@ index 4328ba4..63af774 100644
 
     const commits = parseGitPatch(patch);
     expect(commits).toHaveLength(1);
-    expect(commits[0].diff).toBe(expextedDiff);
+    expect(commits[0].diff).toBe(expectedDiff);
   });
 });

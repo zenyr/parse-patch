@@ -1,13 +1,22 @@
-export type ParsedCommit = {
-  sha: string;
-  authorName: string;
-  authorEmail: string;
-  date: string;
-  message: string;
-  diff: string;
+import { ParseOptions, ParsedCommit, FileChange } from "../../types";
+import { parseDiffToStructured } from "./diffToStructured";
+
+const HEADERS = {
+  FROM: "From: ",
+  DATE: "Date: ",
+  SUBJECT: "Subject: ",
 };
 
-export function parseGitPatch(patch: string): ParsedCommit[] {
+const REGEX = {
+  FROM: /^From\s+([0-9a-f]{40})\s/,
+  AUTHOR_EMAIL: /<(.*)>/,
+  PATCH_HEADER: /^\[PATCH[^\]]*\]\s*/,
+};
+
+export function parseGitPatch(
+  patch: string,
+  options: ParseOptions = {}
+): ParsedCommit[] {
   const lines = patch.split("\n");
   const commits: ParsedCommit[] = [];
 
@@ -23,16 +32,51 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
 
   const finalizeCommit = () => {
     if (!currentSha) return; // No commit started yet
+
+    const message = currentMessageLines.join("\n").trimEnd(); // trimEnd to preserve leading/internal newlines
+    let date: string | Date = currentDate;
+    // Join lines, then trim trailing newlines that might have been added if the original patch ended with multiple blank lines.
+    // Then, ensure a single trailing newline if there's content.
+    let diffString = currentDiffLines.join("\n").replace(/\n+$/, "");
+    if (diffString.length > 0) {
+      diffString += "\n";
+    }
+    
+    let diff: string | FileChange[] = diffString;
+
+    // Process based on options
+    if (options.parseDates && currentDate) {
+      try {
+        date = new Date(currentDate);
+      } catch (e) {
+        // Keep original string if date parsing fails
+        console.warn(`Failed to parse date: ${currentDate}`);
+      }
+    }
+
+    // Process structured diff
+    if (
+      options.structuredDiff &&
+      typeof diff === "string" &&
+      diff.trim().length > 0
+    ) {
+      diff = parseDiffToStructured(diff);
+    }
+
     commits.push({
       sha: currentSha,
       authorName: currentAuthorName,
       authorEmail: currentAuthorEmail,
-      date: currentDate,
-      message: currentMessageLines.join("\n").trim(),
-      diff:
-        currentDiffLines.join("\n") + (currentDiffLines.length > 0 ? "\n" : ""),
+      date,
+      message,
+      diff,
     });
+
     // Reset for next commit
+    resetCommitState();
+  };
+
+  const resetCommitState = () => {
     currentSha = "";
     currentAuthorName = "";
     currentAuthorEmail = "";
@@ -46,7 +90,7 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
 
   for (const line of lines) {
     // Detect the start of a new commit
-    const fromMatch = line.match(/^From\s+([0-9a-f]{40})\s/);
+    const fromMatch = line.match(REGEX.FROM);
     if (fromMatch) {
       finalizeCommit();
       currentSha = fromMatch[1];
@@ -54,9 +98,9 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
     }
 
     // Parse author line: From: Name <email>
-    if (line.startsWith("From: ")) {
-      const authorLine = line.slice("From: ".length).trim();
-      const emailMatch = authorLine.match(/<(.*)>/);
+    if (line.startsWith(HEADERS.FROM)) {
+      const authorLine = line.slice(HEADERS.FROM.length).trim();
+      const emailMatch = authorLine.match(REGEX.AUTHOR_EMAIL);
       if (emailMatch) {
         currentAuthorEmail = emailMatch[1];
         currentAuthorName = authorLine.slice(0, authorLine.indexOf("<")).trim();
@@ -67,16 +111,16 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
     }
 
     // Parse date line: Date: ...
-    if (line.startsWith("Date: ")) {
-      currentDate = line.slice("Date: ".length).trim();
+    if (line.startsWith(HEADERS.DATE)) {
+      currentDate = line.slice(HEADERS.DATE.length).trim();
       continue;
     }
 
     // Parse subject line
-    if (line.startsWith("Subject: ")) {
-      let subject = line.slice("Subject: ".length).trim();
+    if (line.startsWith(HEADERS.SUBJECT)) {
+      let subject = line.slice(HEADERS.SUBJECT.length).trim();
       // Remove leading "[PATCH ...]" if present
-      subject = subject.replace(/^\[PATCH[^\]]*\]\s*/, "");
+      subject = subject.replace(REGEX.PATCH_HEADER, "");
       currentMessageLines.push(subject);
       inMessageSection = true;
       continue;
@@ -91,6 +135,9 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
 
     // If we are in the message section, just append lines to message
     if (inMessageSection) {
+      // For subject lines, they are already pushed.
+      // For subsequent message lines, they might have leading spaces from the patch format.
+      // We should preserve these as they are part of the message.
       currentMessageLines.push(line);
       continue;
     }
@@ -123,4 +170,3 @@ export function parseGitPatch(patch: string): ParsedCommit[] {
 
   return commits;
 }
-
