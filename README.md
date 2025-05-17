@@ -66,13 +66,15 @@ console.log(commits);
 
 ```typescript
 // Generate patch with `git format-patch --stdout`
-parseGitPatch(patch: string): {
+parseGitPatch(patch: string, options?: ParseOptions): {
   sha: string;
   authorName: string;
   authorEmail: string;
-  date: string;
+  // String by default, or Date object if options.parseDates is true.
+  date: string | Date; 
   message: string;
-  diff: string;
+  // Raw string by default, or FileChange[] if options.structuredDiff is true.
+  diff: string | FileChange[];
 }[]
 ```
 
