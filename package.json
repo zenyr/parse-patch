@@ -17,7 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "bun run scripts/cleanDist.ts && tsc",
     "release": "bun run build && np",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
